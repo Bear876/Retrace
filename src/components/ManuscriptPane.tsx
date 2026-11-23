@@ -20,11 +20,11 @@ interface ManuscriptPaneProps {
 
 const HIGHLIGHT_CLASSES: Record<FindingStatus, string> = {
   reported:
-    'bg-emerald-50 text-slate-900 border-b-2 border-emerald-600 hover:bg-emerald-100/90',
+    'bg-emerald-100/55 text-zinc-900 border-b border-emerald-700 hover:bg-emerald-100',
   unclear:
-    'bg-amber-50 text-slate-900 border-b-2 border-amber-500 hover:bg-amber-100/90',
+    'bg-amber-100/65 text-zinc-900 border-b border-amber-700 hover:bg-amber-100',
   missing:
-    'bg-rose-50 text-slate-900 border-b-2 border-rose-600 hover:bg-rose-100/90',
+    'bg-rose-100/65 text-zinc-900 border-b border-rose-700 hover:bg-rose-100',
 };
 
 export function ManuscriptPane({
@@ -65,16 +65,16 @@ export function ManuscriptPane({
   return (
     <section
       aria-label="Methods text panel"
-      className="flex flex-col rounded-lg border border-slate-200 bg-white"
+      className="flex flex-col rounded-xs border border-zinc-300 bg-white"
     >
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/70 px-4 py-3 rounded-t-lg">
+      <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3">
         <div className="flex items-center gap-2 text-sm">
-          <h2 className="font-display font-semibold text-slate-900">Methods Text</h2>
-          <span className="text-slate-300" aria-hidden="true">
-            ·
+          <h2 className="font-medium text-zinc-900">Methods Text</h2>
+          <span className="text-zinc-300" aria-hidden="true">
+            /
           </span>
-          <span className="text-xs text-slate-500">
-            {showAnnotated ? 'Annotated view' : 'Draft editor'}
+          <span className="text-xs text-zinc-500">
+            {showAnnotated ? 'Annotated' : 'Editor'}
           </span>
         </div>
 
@@ -82,7 +82,7 @@ export function ManuscriptPane({
           <button
             type="button"
             onClick={() => onToggleEditing(!isEditing)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700 hover:text-zinc-950 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {isEditing ? (
               <>
@@ -102,7 +102,7 @@ export function ManuscriptPane({
       {showAnnotated ? (
         <div className="flex flex-col justify-between flex-1">
           <div
-            className="p-5 text-[15px] leading-[1.75] text-slate-800 whitespace-pre-wrap lg:min-h-[460px] lg:max-h-[580px] lg:overflow-y-auto"
+            className="p-6 font-serif text-[16px] leading-[1.8] text-zinc-900 whitespace-pre-wrap lg:min-h-[480px] lg:max-h-[620px] lg:overflow-y-auto"
             tabIndex={0}
             aria-label="Annotated methods passage with clickable highlights"
           >
@@ -140,12 +140,12 @@ export function ManuscriptPane({
                       }
                     }}
                     onClick={() => onSelectFindingFromHighlight(primaryFindingId)}
-                    title="Click to jump to finding card"
-                    className={`inline text-left rounded-[2px] px-0.5 transition-colors cursor-pointer ${
+                    title="Jump to finding"
+                    className={`inline text-left transition-colors cursor-pointer ${
                       HIGHLIGHT_CLASSES[seg.primaryStatus]
                     } ${
                       isSelected
-                        ? 'ring-2 ring-sky-700 ring-offset-1 bg-sky-100/80'
+                        ? 'ring-2 ring-zinc-900 ring-offset-1 bg-zinc-200/70'
                         : ''
                     }`}
                   >
@@ -156,22 +156,22 @@ export function ManuscriptPane({
             })()}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600 rounded-b-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 px-5 py-2.5 text-xs text-zinc-500">
             <div className="flex flex-wrap items-center gap-4">
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 border-b-2 border-emerald-600 bg-emerald-50 h-2.5" aria-hidden="true" />
+                <span className="inline-block w-3 border-b border-emerald-700 bg-emerald-100/70 h-2.5" aria-hidden="true" />
                 Reported
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 border-b-2 border-amber-500 bg-amber-50 h-2.5" aria-hidden="true" />
+                <span className="inline-block w-3 border-b border-amber-700 bg-amber-100/80 h-2.5" aria-hidden="true" />
                 Unclear
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-3 border-b-2 border-rose-600 bg-rose-50 h-2.5" aria-hidden="true" />
+                <span className="inline-block w-3 border-b border-rose-700 bg-rose-100/80 h-2.5" aria-hidden="true" />
                 Missing anchor
               </span>
             </div>
-            <span className="text-slate-500">Click any highlight to inspect finding</span>
+            <span>Select a passage to view its note</span>
           </div>
         </div>
       ) : (
@@ -184,12 +184,12 @@ export function ManuscriptPane({
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Paste the methods section of a paper or lab report here (for example: reagents, concentrations, instruments, sample sizes, controls, software versions, and statistical tests)..."
-            className="w-full flex-1 resize-y p-5 text-[15px] leading-[1.75] text-slate-900 placeholder:text-slate-400 focus:outline-none min-h-[340px] lg:min-h-[460px] rounded-none"
+            placeholder="Paste the methods section of a paper or lab report here (reagents, concentrations, instruments, conditions, sample sizes, controls, software versions, statistical tests, and data availability)..."
+            className="w-full flex-1 resize-y p-6 font-serif text-[16px] leading-[1.8] text-zinc-900 placeholder:text-zinc-400 placeholder:font-sans placeholder:text-sm focus:outline-none min-h-[360px] lg:min-h-[480px]"
           />
-          <div className="flex items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-500 rounded-b-lg">
+          <div className="flex items-center justify-between gap-4 border-t border-zinc-200 px-5 py-2.5 text-xs text-zinc-500">
             <span>Only verbatim quotes matching your text are highlighted.</span>
-            <span className="hidden sm:inline font-mono">Ctrl/Cmd + Enter to check</span>
+            <span className="hidden sm:inline font-mono">Ctrl/Cmd + Enter</span>
           </div>
         </div>
       )}
