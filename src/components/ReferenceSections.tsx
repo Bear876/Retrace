@@ -3,129 +3,75 @@ import { CATEGORY_DETAILS } from '../lib/reproducibility.ts';
 
 export function ReferenceSections() {
   return (
-    <div className="mt-16 space-y-16 border-t border-slate-200 pt-14">
+    <div className="mt-14 space-y-12 border-t border-zinc-300 pt-10">
       <section id="checklist" aria-labelledby="checklist-heading">
-        <div className="max-w-2xl">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
           <h2
             id="checklist-heading"
-            className="font-display text-2xl font-semibold tracking-tight text-slate-900"
+            className="font-serif text-xl font-semibold text-zinc-900"
           >
-            Nine-category reproducibility checklist
+            Checklist criteria
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Every check evaluates only the categories relevant to the study type so computational, field, and bench papers are not penalized for irrelevant criteria.
+          <p className="text-xs text-zinc-500">
+            Inapplicable categories are skipped per study type rather than penalized.
           </p>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden sm:grid-cols-2 lg:grid-cols-3">
-          {CATEGORY_DETAILS.map((item, idx) => (
-            <div key={item.name} className="bg-white p-5">
-              <p className="font-mono text-xs text-slate-400 tabular-nums">
-                {String(idx + 1).padStart(2, '0')}.
-              </p>
-              <h3 className="mt-1 font-display text-sm font-semibold text-slate-900">
-                {item.name}
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
-                {item.summary}
-              </p>
-              <p className="mt-2.5 font-mono text-xs text-slate-500">
-                e.g. {item.examples}
-              </p>
-            </div>
-          ))}
+        <div className="mt-4 overflow-x-auto border border-zinc-300 bg-white rounded-xs">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 text-xs font-medium text-zinc-500">
+                <th className="py-2.5 px-4 w-12 font-mono">#</th>
+                <th className="py-2.5 px-4">Category</th>
+                <th className="py-2.5 px-4">What is checked</th>
+                <th className="py-2.5 px-4 hidden md:table-cell">Examples</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              {CATEGORY_DETAILS.map((item, idx) => (
+                <tr key={item.name} className="align-top">
+                  <td className="py-2.5 px-4 font-mono text-xs text-zinc-400 tabular-nums">
+                    {String(idx + 1).padStart(2, '0')}
+                  </td>
+                  <td className="py-2.5 px-4 font-medium text-zinc-900 whitespace-nowrap">
+                    {item.name}
+                  </td>
+                  <td className="py-2.5 px-4 text-zinc-600">{item.summary}</td>
+                  <td className="py-2.5 px-4 font-mono text-xs text-zinc-500 hidden md:table-cell">
+                    {item.examples}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section
-        id="how-it-works"
-        aria-labelledby="how-heading"
-        className="grid grid-cols-1 gap-8 border-t border-slate-200 pt-12 lg:grid-cols-12"
-      >
-        <div className="lg:col-span-4">
+      <div className="grid grid-cols-1 gap-8 border-t border-zinc-200 pt-8 md:grid-cols-2">
+        <section id="scoring" aria-labelledby="scoring-heading">
           <h2
-            id="how-heading"
-            className="font-display text-2xl font-semibold tracking-tight text-slate-900"
+            id="scoring-heading"
+            className="font-serif text-lg font-semibold text-zinc-900"
           >
-            How verification works
+            Quote verification and counting
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Structured AI extraction paired with deterministic client and server checks.
+          <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+            Every quote returned during an audit is checked character-for-character against your submitted methods text. Any quote that does not match verbatim is marked unverified and is never highlighted. The summary count is computed deterministically in code from applicable findings (1 point per reported item, 0.5 per unclear item, 0 per missing item).
           </p>
-        </div>
+        </section>
 
-        <div className="lg:col-span-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Schema-constrained extraction
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Gemini returns structured JSON matching a strict response schema covering category, status, verbatim quote, issue, and suggested fix, with no brittle regex parsing.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Linked highlight navigation
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Click any highlighted passage in your methods text to jump to its card, or click Locate on a finding card to highlight the exact span in the draft.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="principles"
-        aria-labelledby="principles-heading"
-        className="grid grid-cols-1 gap-8 border-t border-slate-200 pt-12 lg:grid-cols-12"
-      >
-        <div className="lg:col-span-4">
+        <section id="limits" aria-labelledby="limits-heading">
           <h2
-            id="principles-heading"
-            className="font-display text-2xl font-semibold tracking-tight text-slate-900"
+            id="limits-heading"
+            className="font-serif text-lg font-semibold text-zinc-900"
           >
-            Responsible AI safeguards
+            Scope and limitations
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Built for student researchers, reviewers, and instructors who need transparent signals rather than black-box grades.
+          <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+            Retrace flags missing or ambiguous operational details only. The finding count reflects reported detail rather than a grade of scientific quality, and the tool never evaluates whether experimental results are true or whether a study design is sound. Drafts are processed transiently in-session and are not stored.
           </p>
-        </div>
-
-        <div className="lg:col-span-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Verbatim quote verification
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Every quote returned by the model is checked character-for-character against your original text. Any quote that does not match verbatim is marked unverified and never highlighted.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Code-computed finding counts
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              The summary readout is calculated in code (reported = 1, unclear = 0.5, missing = 0), never generated by the model, and never presented as a scientific quality grade.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Narrow methodological claims
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Retrace flags missing operational detail only. It never claims whether experimental results are true, statistically valid, or scientifically sound.
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              Stateless inspection
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Submitted methods drafts are processed transiently in-session and are never persisted to a database.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
