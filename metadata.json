@@ -1,0 +1,6 @@
+{
+  "name": "Retrace",
+  "description": "Methods reproducibility checker that audits scientific papers and lab reports for missing experimental, computational, and statistical details.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
