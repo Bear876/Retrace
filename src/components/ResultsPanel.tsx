@@ -1,11 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  AlertTriangle,
-  Check,
-  Copy,
-  LocateFixed,
-  Loader2,
-} from 'lucide-react';
+import { AlertTriangle, Check, Copy, Loader2 } from 'lucide-react';
 import {
   FindingStatus,
   VerifiedFinding,
@@ -31,17 +25,17 @@ const STATUS_DISPLAY: Record<
   reported: {
     symbol: '✓',
     label: 'Reported',
-    textClass: 'text-emerald-700',
+    textClass: 'text-emerald-800',
   },
   unclear: {
     symbol: '△',
     label: 'Unclear',
-    textClass: 'text-amber-700',
+    textClass: 'text-amber-800',
   },
   missing: {
     symbol: '✕',
     label: 'Missing',
-    textClass: 'text-rose-700',
+    textClass: 'text-rose-800',
   },
 };
 
@@ -98,7 +92,7 @@ export function ResultsPanel({
         setCopiedId((cur) => (cur === findingId ? null : cur));
       }, 1800);
     } catch {
-      // Clipboard blocked in restricted browser context; fail silently without crashing
+      // Clipboard blocked in restricted browser context; fail silently
     }
   };
 
@@ -106,24 +100,22 @@ export function ResultsPanel({
     <section
       aria-label="Reproducibility audit results"
       aria-live="polite"
-      className="flex flex-col rounded-lg border border-slate-200 bg-white"
+      className="flex flex-col rounded-xs border border-zinc-300 bg-white"
     >
-      <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-slate-50/70 px-4 py-3 rounded-t-lg">
-        <h2 className="font-display text-sm font-semibold text-slate-900">
-          Audit Results
-        </h2>
+      <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3">
+        <h2 className="text-sm font-medium text-zinc-900">Review Notes</h2>
         {report && !isLoading && (
-          <span className="text-xs text-slate-500 truncate max-w-[260px]">
+          <span className="text-xs text-zinc-500 truncate max-w-[260px]">
             {report.studyType}
           </span>
         )}
       </div>
 
-      <div className="p-4 sm:p-5 flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col">
         {error && (
           <div
             role="alert"
-            className="mb-4 flex items-start justify-between gap-3 rounded-md border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-900"
+            className="mx-5 mt-4 flex items-start justify-between gap-3 border border-rose-300 bg-rose-50 px-3.5 py-3 text-sm text-rose-900"
           >
             <div className="flex items-start gap-2.5">
               <AlertTriangle
@@ -135,7 +127,7 @@ export function ResultsPanel({
             <button
               type="button"
               onClick={onDismissError}
-              className="text-xs font-medium text-rose-700 hover:text-rose-900 underline shrink-0 cursor-pointer"
+              className="text-xs font-medium text-rose-800 hover:text-rose-950 underline shrink-0 cursor-pointer"
             >
               Dismiss
             </button>
@@ -143,74 +135,64 @@ export function ResultsPanel({
         )}
 
         {isLoading ? (
-          <div className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center">
             <Loader2
-              className="h-6 w-6 animate-spin text-sky-700 mb-3"
+              className="h-5 w-5 animate-spin text-zinc-700 mb-3"
               aria-hidden="true"
             />
-            <p className="text-sm font-medium text-slate-900">
-              Checking methods against nine reproducibility categories…
+            <p className="text-sm font-medium text-zinc-900">
+              Reading methods against nine criteria…
             </p>
-            <p className="mt-1 text-xs text-slate-500 max-w-sm">
-              Verifying verbatim quotes and computing finding counts from structured output.
+            <p className="mt-1 text-xs text-zinc-500">
+              Checking verbatim quotes and counting applicable findings.
             </p>
           </div>
         ) : !report ? (
-          <div className="flex flex-1 flex-col justify-center py-12 px-2 text-left max-w-md mx-auto">
-            <p className="font-display text-base font-semibold text-slate-900">
-              Ready to audit a methods section
+          <div className="flex flex-1 flex-col justify-center px-6 py-14 max-w-md">
+            <p className="font-serif text-lg font-medium text-zinc-900">
+              No methods text checked yet
             </p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              Paste a paper or lab report methods section on the left and click{' '}
-              <span className="font-medium text-slate-900">Check methods</span>, or load one of the sample presets above with no API setup required.
+            <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+              Paste a paper or lab report methods section on the left and select{' '}
+              <span className="font-medium text-zinc-900">Check methods</span>, or load one of the sample passages above.
             </p>
-            <dl className="mt-5 space-y-2 border-t border-slate-200 pt-4 text-xs text-slate-600">
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="font-medium text-slate-800">Verbatim quote verification</dt>
-                <dd className="text-slate-500">Unmatched quotes flagged &amp; never highlighted</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="font-medium text-slate-800">Code-computed finding count</dt>
-                <dd className="font-mono text-slate-500 tabular-nums">1 / 0.5 / 0 pts</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="font-medium text-slate-800">Scope</dt>
-                <dd className="text-slate-500">Flags missing detail only</dd>
-              </div>
-            </dl>
+            <ul className="mt-5 space-y-2 border-t border-zinc-200 pt-4 text-xs text-zinc-600">
+              <li>1. Quotes are matched verbatim before highlighting.</li>
+              <li>2. Counts sum reported (1), unclear (0.5), and missing (0).</li>
+              <li>3. Irrelevant checklist items are skipped by study type.</li>
+            </ul>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            <div className="rounded-md border border-slate-200 bg-slate-50/60 p-4">
+          <div className="flex flex-col">
+            {/* Flat Ruled Summary Block */}
+            <div className="border-b border-zinc-200 px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">
-                    Code-computed finding count
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-2">
-                    <span className="font-mono text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">
-                      {report.score.points}
-                    </span>
-                    <span className="font-mono text-sm text-slate-500 tabular-nums">
-                      / {report.score.totalApplicable} applicable findings
-                    </span>
-                  </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-2xl font-semibold tracking-tight text-zinc-900 tabular-nums">
+                    {report.score.points}
+                  </span>
+                  <span className="font-mono text-sm text-zinc-500 tabular-nums">
+                    / {report.score.totalApplicable}
+                  </span>
+                  <span className="text-xs text-zinc-600 ml-1">
+                    applicable findings addressed
+                  </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 text-xs font-mono tabular-nums">
-                  <span className="text-emerald-700 font-medium">
+                  <span className="text-emerald-800">
                     ✓ {report.score.reportedCount} reported
                   </span>
-                  <span className="text-slate-300" aria-hidden="true">
+                  <span className="text-zinc-300" aria-hidden="true">
                     ·
                   </span>
-                  <span className="text-amber-700 font-medium">
+                  <span className="text-amber-800">
                     △ {report.score.unclearCount} unclear
                   </span>
-                  <span className="text-slate-300" aria-hidden="true">
+                  <span className="text-zinc-300" aria-hidden="true">
                     ·
                   </span>
-                  <span className="text-rose-700 font-medium">
+                  <span className="text-rose-800">
                     ✕ {report.score.missingCount} missing
                   </span>
                 </div>
@@ -218,13 +200,13 @@ export function ResultsPanel({
 
               {report.score.totalApplicable > 0 && (
                 <div
-                  className="mt-3 flex h-2.5 w-full overflow-hidden rounded-sm bg-slate-200"
+                  className="mt-3 flex h-1.5 w-full overflow-hidden bg-zinc-200"
                   role="img"
                   aria-label={`Finding distribution: ${report.score.reportedCount} reported, ${report.score.unclearCount} unclear, ${report.score.missingCount} missing`}
                 >
                   {report.score.reportedCount > 0 && (
                     <div
-                      className="bg-emerald-600 transition-all duration-200"
+                      className="bg-emerald-700 transition-all duration-200"
                       style={{
                         width: `${(report.score.reportedCount / report.score.totalApplicable) * 100}%`,
                       }}
@@ -240,7 +222,7 @@ export function ResultsPanel({
                   )}
                   {report.score.missingCount > 0 && (
                     <div
-                      className="bg-rose-600 transition-all duration-200"
+                      className="bg-rose-700 transition-all duration-200"
                       style={{
                         width: `${(report.score.missingCount / report.score.totalApplicable) * 100}%`,
                       }}
@@ -249,66 +231,64 @@ export function ResultsPanel({
                 </div>
               )}
 
-              <p className="mt-2.5 text-xs text-slate-500 leading-relaxed">
-                Count computed deterministically from findings (reported = 1, unclear = 0.5, missing = 0). Measures reported detail only, not a scientific quality grade or claim about validity.
+              <p className="mt-2.5 text-xs text-zinc-500 leading-relaxed">
+                Count computed from findings (reported = 1, unclear = 0.5, missing = 0). Checks missing detail only, not scientific merit.
               </p>
 
               {report.score.unverifiedQuoteCount > 0 && (
-                <p className="mt-2 text-xs font-medium text-amber-800">
+                <p className="mt-1.5 text-xs font-medium text-amber-800">
                   {report.score.unverifiedQuoteCount} quote
-                  {report.score.unverifiedQuoteCount === 1 ? '' : 's'} failed verbatim matching and{' '}
-                  {report.score.unverifiedQuoteCount === 1 ? 'was' : 'were'} excluded from highlighting.
+                  {report.score.unverifiedQuoteCount === 1 ? '' : 's'} did not match verbatim and{' '}
+                  {report.score.unverifiedQuoteCount === 1 ? 'was' : 'were'} not highlighted.
                 </p>
               )}
 
               {report.skippedCategories.length > 0 && (
-                <div className="mt-2.5 border-t border-slate-200 pt-2.5 text-xs text-slate-600">
-                  <span className="font-medium text-slate-700">
-                    Skipped for study type ({report.skippedCategories.length}):
-                  </span>{' '}
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  <span className="font-medium text-zinc-700">Skipped:</span>{' '}
                   {report.skippedCategories.map((s) => s.category).join(', ')}
-                </div>
+                </p>
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div
-                className="inline-flex items-center gap-1 rounded-md bg-slate-100 p-1"
-                role="tablist"
-                aria-label="Filter findings by status"
-              >
-                {(
-                  [
-                    { key: 'all', label: `All (${report.findings.length})` },
-                    { key: 'missing', label: `Missing (${report.score.missingCount})` },
-                    { key: 'unclear', label: `Unclear (${report.score.unclearCount})` },
-                    { key: 'reported', label: `Reported (${report.score.reportedCount})` },
-                  ] as const
-                ).map((tab) => {
-                  const active = filter === tab.key;
-                  return (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setFilter(tab.key)}
-                      className={`rounded px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        active
-                          ? 'bg-white text-slate-900 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Baseline-Underlined Filter Tabs */}
+            <div
+              className="flex items-center gap-5 border-b border-zinc-200 px-5"
+              role="tablist"
+              aria-label="Filter findings by status"
+            >
+              {(
+                [
+                  { key: 'all', label: `All (${report.findings.length})` },
+                  { key: 'missing', label: `Missing (${report.score.missingCount})` },
+                  { key: 'unclear', label: `Unclear (${report.score.unclearCount})` },
+                  { key: 'reported', label: `Reported (${report.score.reportedCount})` },
+                ] as const
+              ).map((tab) => {
+                const active = filter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setFilter(tab.key)}
+                    className={`-mb-px border-b-2 py-2.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                      active
+                        ? 'border-zinc-900 text-zinc-900'
+                        : 'border-transparent text-zinc-500 hover:text-zinc-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="space-y-3 lg:max-h-[430px] lg:overflow-y-auto lg:pr-1">
+            {/* Ruled Review Notes List */}
+            <div className="divide-y divide-zinc-200 lg:max-h-[470px] lg:overflow-y-auto">
               {filteredFindings.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">
+                <p className="py-10 text-center text-sm text-zinc-500">
                   No findings match this filter.
                 </p>
               ) : (
@@ -326,26 +306,24 @@ export function ResultsPanel({
                       onClick={() => {
                         if (canJump) onSelectFindingFromCard(finding);
                       }}
-                      className={`rounded-md border p-4 transition-colors ${
-                        isSelected
-                          ? 'border-sky-700 ring-1 ring-sky-700 bg-sky-50/30'
-                          : 'border-slate-200 bg-white'
-                      } ${canJump ? 'cursor-pointer hover:border-slate-300' : ''}`}
+                      className={`px-5 py-4 transition-colors ${
+                        isSelected ? 'bg-zinc-100/80' : 'bg-white'
+                      } ${canJump ? 'cursor-pointer hover:bg-zinc-50' : ''}`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-display text-sm font-semibold text-slate-900">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="text-sm font-semibold text-zinc-900">
                           {finding.category}
                         </h3>
                         <span
-                          className={`text-xs font-semibold whitespace-nowrap shrink-0 ${statusMeta.textClass}`}
+                          className={`text-xs font-medium whitespace-nowrap shrink-0 ${statusMeta.textClass}`}
                         >
                           {statusMeta.symbol} {statusMeta.label}
                         </span>
                       </div>
 
                       {finding.quoteState === 'verified' && finding.quote && (
-                        <div className="mt-2.5 flex items-start justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2">
-                          <blockquote className="font-mono text-xs leading-relaxed text-slate-700">
+                        <div className="mt-2 flex items-start justify-between gap-3">
+                          <blockquote className="font-mono text-xs leading-relaxed text-zinc-600">
                             &ldquo;{finding.quote}&rdquo;
                           </blockquote>
                           <button
@@ -356,47 +334,46 @@ export function ResultsPanel({
                             }}
                             title="Jump to highlight in methods text"
                             aria-label={`Locate ${finding.category} quote in methods text`}
-                            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-sky-700 hover:bg-sky-100/70 shrink-0 cursor-pointer"
+                            className="text-xs font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-950 shrink-0 cursor-pointer"
                           >
-                            <LocateFixed className="h-3 w-3" aria-hidden="true" />
                             Locate
                           </button>
                         </div>
                       )}
 
                       {finding.quoteState === 'unverified' && finding.quote && (
-                        <div className="mt-2.5 rounded border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
-                          <p className="font-semibold">
+                        <div className="mt-2 rounded-xs border border-amber-300 bg-amber-50/60 px-3 py-2 text-xs text-amber-900">
+                          <p className="font-medium">
                             Unverified quote: not found verbatim in your text (not highlighted)
                           </p>
-                          <p className="mt-1 font-mono text-amber-800">
+                          <p className="mt-0.5 font-mono text-amber-800">
                             &ldquo;{finding.quote}&rdquo;
                           </p>
                         </div>
                       )}
 
                       {finding.quoteState === 'none' && (
-                        <p className="mt-2 text-xs text-slate-400">
-                          No verbatim passage in text to highlight.
+                        <p className="mt-1.5 text-xs text-zinc-400">
+                          No matching passage in text.
                         </p>
                       )}
 
-                      <p className="mt-2.5 text-sm leading-relaxed text-slate-700">
+                      <p className="mt-2 text-sm leading-relaxed text-zinc-700">
                         {finding.issue}
                       </p>
 
                       {finding.suggestedFix && (
-                        <div className="mt-3 border-t border-slate-100 pt-2.5">
+                        <div className="mt-2.5 flex flex-col gap-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-slate-500">
-                              Suggested fix
+                            <span className="text-xs font-medium text-zinc-500">
+                              Suggested addition
                             </span>
                             <button
                               type="button"
                               onClick={(e) =>
                                 handleCopyFix(e, finding.id, finding.suggestedFix)
                               }
-                              className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                              className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-950 underline underline-offset-2 cursor-pointer"
                             >
                               {copiedId === finding.id ? (
                                 <>
@@ -406,12 +383,12 @@ export function ResultsPanel({
                               ) : (
                                 <>
                                   <Copy className="h-3 w-3" aria-hidden="true" />
-                                  Copy fix
+                                  Copy
                                 </>
                               )}
                             </button>
                           </div>
-                          <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                          <p className="text-xs leading-relaxed text-zinc-600">
                             {finding.suggestedFix}
                           </p>
                         </div>
