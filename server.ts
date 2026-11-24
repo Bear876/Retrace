@@ -143,6 +143,7 @@ async function callGeminiWithRetry(text: string): Promise<RawModelReport> {
     } catch (err) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
+      // Do not retry non-transient configuration/auth errors
       if (
         msg.includes('MISSING_API_KEY') ||
         msg.includes('API_KEY_INVALID') ||
@@ -165,6 +166,10 @@ async function callGeminiWithRetry(text: string): Promise<RawModelReport> {
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
+
+  app.get('/favicon.ico', (_req, res) => {
+    res.status(204).end();
+  });
 
   app.post('/api/check-methods', async (req, res) => {
     const body = req.body as { text?: unknown };
@@ -211,6 +216,13 @@ async function startServer() {
         res.status(429).json({
           error:
             'Rate limit reached on the Gemini API key. Please wait a moment and try again.',
+        });
+        return;
+      }
+      if (msg.includes('UNAVAILABLE') || msg.includes('503')) {
+        res.status(503).json({
+          error:
+            'The Gemini model is temporarily experiencing high demand. Please wait a few seconds and try again.',
         });
         return;
       }
