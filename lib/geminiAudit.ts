@@ -45,8 +45,13 @@ const RESPONSE_SCHEMA = {
             description:
               'Concrete, specific addition or clarification the author could add to make the step repeatable. Empty string if no addition is needed.',
           },
+          draftTemplate: {
+            type: Type.STRING,
+            description:
+              'For "missing" or "unclear" findings, a single ready-to-paste sentence with [bracketed placeholders] for missing specifics (e.g., "Cells were maintained at 37 °C in [5% CO2] after seeding at [density]."). Empty string "" if status is "reported".',
+          },
         },
-        required: ['category', 'status', 'quote', 'issue', 'suggestedFix'],
+        required: ['category', 'status', 'quote', 'issue', 'suggestedFix', 'draftTemplate'],
       },
     },
     skippedCategories: {
@@ -85,6 +90,7 @@ Strict rules:
 - Narrow claims only: flag missing or ambiguous methodological detail only. NEVER judge whether the results are true, whether the hypothesis is valid, or whether the science is "good".
 - Applicability: Skip categories that genuinely do not fit the study type (for example, do not penalize a pure computational/ML study for missing wet-lab "Materials and reagents", or a qualitative synthesis for missing "Quantities and concentrations"). Put skipped categories in "skippedCategories" with a brief reason, and do not include them in "findings".
 - Verbatim quotes: For every finding that references the text, "quote" MUST be an exact, character-for-character substring copied directly from the input text. Never paraphrase, combine non-adjacent sentences with ellipses, or alter punctuation. If a detail is completely absent ("missing") with no anchor phrase, set "quote" to "".
+- Draft templates: For "missing" or "unclear" findings, provide a concise, single-sentence "draftTemplate" using [bracketed placeholders] for unknown specifics so the author can paste and fill it in. For "reported" findings, set "draftTemplate" to "".
 - Status definitions:
   - "reported": Essential details in this category are explicitly stated with enough specificity to repeat.
   - "unclear": Mentioned in the text, but key parameters (catalog numbers, concentrations, versions, replicate definitions, test directionality, etc.) are missing or ambiguous.
