@@ -9,6 +9,7 @@ import {
 interface ResultsPanelProps {
   report: VerifiedReport | null;
   isLoading: boolean;
+  isOutdated?: boolean;
   error: string | null;
   selectedFindingId: string | null;
   cardPulseSeq: number;
@@ -42,6 +43,7 @@ const STATUS_DISPLAY: Record<
 export function ResultsPanel({
   report,
   isLoading,
+  isOutdated = false,
   error,
   selectedFindingId,
   cardPulseSeq,
@@ -164,6 +166,11 @@ export function ResultsPanel({
           </div>
         ) : (
           <div className="flex flex-col">
+            {isOutdated && (
+              <div className="border-b border-amber-200 bg-amber-50/70 px-5 py-2 text-xs text-amber-900">
+                Draft edited since this review. Click <span className="font-medium">Check methods</span> to re-audit.
+              </div>
+            )}
             {/* Flat Ruled Summary Block */}
             <div className="border-b border-zinc-200 px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -295,7 +302,7 @@ export function ResultsPanel({
                 filteredFindings.map((finding) => {
                   const statusMeta = STATUS_DISPLAY[finding.status];
                   const isSelected = selectedFindingId === finding.id;
-                  const canJump = finding.quoteState === 'verified';
+                  const canJump = !isOutdated && finding.quoteState === 'verified';
 
                   return (
                     <article
@@ -326,18 +333,20 @@ export function ResultsPanel({
                           <blockquote className="font-mono text-xs leading-relaxed text-zinc-600">
                             &ldquo;{finding.quote}&rdquo;
                           </blockquote>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectFindingFromCard(finding);
-                            }}
-                            title="Jump to highlight in methods text"
-                            aria-label={`Locate ${finding.category} quote in methods text`}
-                            className="text-xs font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-950 shrink-0 cursor-pointer"
-                          >
-                            Locate
-                          </button>
+                          {!isOutdated && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectFindingFromCard(finding);
+                              }}
+                              title="Jump to highlight in methods text"
+                              aria-label={`Locate ${finding.category} quote in methods text`}
+                              className="text-xs font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-950 shrink-0 cursor-pointer"
+                            >
+                              Locate
+                            </button>
+                          )}
                         </div>
                       )}
 
