@@ -57,6 +57,11 @@ export default function App() {
     if (error) {
       setError(null);
     }
+    if (!next.trim()) {
+      setReport(null);
+      setSelectedFindingId(null);
+      setIsEditing(true);
+    }
   };
 
   const handleClear = () => {
@@ -124,11 +129,15 @@ export default function App() {
     setCardPulseSeq((n) => n + 1);
   }, []);
 
-  const handleSelectFindingFromCard = useCallback((finding: VerifiedFinding) => {
-    setSelectedFindingId(finding.id);
-    setIsEditing(false);
-    setHighlightPulseSeq((n) => n + 1);
-  }, []);
+  const handleSelectFindingFromCard = useCallback(
+    (finding: VerifiedFinding) => {
+      if (report && report.sourceText !== text) return;
+      setSelectedFindingId(finding.id);
+      setIsEditing(false);
+      setHighlightPulseSeq((n) => n + 1);
+    },
+    [report, text],
+  );
 
   return (
     <div id="top" className="min-h-screen flex flex-col bg-[#f4f4f2] text-zinc-900">
@@ -219,6 +228,7 @@ export default function App() {
             <ResultsPanel
               report={report}
               isLoading={isLoading}
+              isOutdated={Boolean(report && report.sourceText !== text)}
               error={error}
               selectedFindingId={selectedFindingId}
               cardPulseSeq={cardPulseSeq}
