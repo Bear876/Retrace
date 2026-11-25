@@ -191,6 +191,12 @@ export default function App() {
       return;
     }
 
+    if (report && report.sourceText === text) {
+      setError(null);
+      setIsEditing(false);
+      return;
+    }
+
     setError(null);
     setIsLoading(true);
 
