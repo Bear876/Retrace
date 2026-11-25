@@ -11,44 +11,39 @@ const RESPONSE_SCHEMA = {
   properties: {
     studyType: {
       type: Type.STRING,
-      description:
-        'Brief classification of the study type inferred solely from the methods text (e.g., "Wet-lab molecular biology", "Computational machine learning", "Clinical observational study").',
+      description: 'Short study type label inferred from the text.',
     },
     findings: {
       type: Type.ARRAY,
-      description:
-        'Checklist audit items for every applicable category from the 9-category checklist. Skip categories that genuinely do not fit the study type and list them in skippedCategories instead.',
+      description: 'Audit items for applicable categories only.',
       items: {
         type: Type.OBJECT,
         properties: {
           category: {
             type: Type.STRING,
-            description: `Must be one of: ${CHECKLIST_CATEGORIES.join(', ')}`,
+            description: `One of: ${CHECKLIST_CATEGORIES.join(', ')}`,
           },
           status: {
             type: Type.STRING,
-            description:
-              'Must be exactly one of: "reported", "unclear", or "missing".',
+            description: '"reported", "unclear", or "missing".',
           },
           quote: {
             type: Type.STRING,
             description:
-              'Exact verbatim substring copied character-for-character from the submitted methods text that supports this finding. If status is "missing" and no relevant passage exists in the text, return an empty string "". Never paraphrase or alter characters.',
+              'Exact verbatim substring from input, or "" if absent.',
           },
           issue: {
             type: Type.STRING,
-            description:
-              'Concise, factual statement of what detail is present, ambiguous, or absent for reproducibility. Never judge scientific validity or whether results are true.',
+            description: 'One concise sentence on operational detail present or missing.',
           },
           suggestedFix: {
             type: Type.STRING,
-            description:
-              'Concrete, specific addition or clarification the author could add to make the step repeatable. Empty string if no addition is needed.',
+            description: 'Brief specific addition, or "" if none needed.',
           },
           draftTemplate: {
             type: Type.STRING,
             description:
-              'For "missing" or "unclear" findings, a single ready-to-paste sentence with [bracketed placeholders] for missing specifics (e.g., "Cells were maintained at 37 °C in [5% CO2] after seeding at [density]."). Empty string "" if status is "reported".',
+              'One bracketed fill-in sentence if missing/unclear, or "" if reported.',
           },
         },
         required: ['category', 'status', 'quote', 'issue', 'suggestedFix', 'draftTemplate'],
@@ -56,8 +51,7 @@ const RESPONSE_SCHEMA = {
     },
     skippedCategories: {
       type: Type.ARRAY,
-      description:
-        'Categories from the 9-category checklist that do not apply to this study type (so the study is not penalized for omitting irrelevant items).',
+      description: 'Categories inapplicable to this study type.',
       items: {
         type: Type.OBJECT,
         properties: {
@@ -71,30 +65,16 @@ const RESPONSE_SCHEMA = {
   required: ['studyType', 'findings', 'skippedCategories'],
 };
 
-const SYSTEM_INSTRUCTION = `You are Retrace, a meticulous scientific methods reproducibility auditor.
-Your ONLY job is to audit a Methods section against a 9-category reproducibility checklist so a reader or student researcher can see which operational details are present, unclear, or missing to repeat the work.
+const SYSTEM_INSTRUCTION = `Audit a Methods section against 9 categories: ${CHECKLIST_CATEGORIES.join('; ')}.
+Rules:
+- Skip categories inapplicable to the study type under skippedCategories with a short reason.
+- Flag missing/unclear operational detail only; never judge scientific merit or invent facts.
+- quote: exact verbatim substring copied from the text, or "" if absent.
+- status: "reported" (specific enough to repeat), "unclear" (mentioned but missing parameters), or "missing" (absent).
+- Keep issue, suggestedFix, and draftTemplate (one [bracketed] sentence if unclear/missing, else "") concise.`;
 
-Checklist of 9 categories:
-1. Materials and reagents
-2. Quantities and concentrations
-3. Equipment and settings
-4. Conditions
-5. Samples and replicates
-6. Controls
-7. Software and versions
-8. Statistical methods
-9. Data and code availability
-
-Strict rules:
-- Do NOT invent details, assume unstated steps, or fill in what the authors "probably did".
-- Narrow claims only: flag missing or ambiguous methodological detail only. NEVER judge whether the results are true, whether the hypothesis is valid, or whether the science is "good".
-- Applicability: Skip categories that genuinely do not fit the study type (for example, do not penalize a pure computational/ML study for missing wet-lab "Materials and reagents", or a qualitative synthesis for missing "Quantities and concentrations"). Put skipped categories in "skippedCategories" with a brief reason, and do not include them in "findings".
-- Verbatim quotes: For every finding that references the text, "quote" MUST be an exact, character-for-character substring copied directly from the input text. Never paraphrase, combine non-adjacent sentences with ellipses, or alter punctuation. If a detail is completely absent ("missing") with no anchor phrase, set "quote" to "".
-- Draft templates: For "missing" or "unclear" findings, provide a concise, single-sentence "draftTemplate" using [bracketed placeholders] for unknown specifics so the author can paste and fill it in. For "reported" findings, set "draftTemplate" to "".
-- Status definitions:
-  - "reported": Essential details in this category are explicitly stated with enough specificity to repeat.
-  - "unclear": Mentioned in the text, but key parameters (catalog numbers, concentrations, versions, replicate definitions, test directionality, etc.) are missing or ambiguous.
-  - "missing": Essential details for this applicable category are absent from the text.`;
+const MAX_CACHE_ENTRIES = 50;
+const auditCache = new Map<string, RawModelReport>();
 
 function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -111,24 +91,50 @@ function getGeminiClient(): GoogleGenAI {
   });
 }
 
-async function callGeminiWithRetry(text: string): Promise<RawModelReport> {
+function isTransientCapacityError(msg: string): boolean {
+  return (
+    msg.includes('UNAVAILABLE') ||
+    msg.includes('503') ||
+    msg.includes('RESOURCE_EXHAUSTED') ||
+    msg.includes('429') ||
+    msg.includes('500') ||
+    msg.includes('502') ||
+    msg.includes('504')
+  );
+}
+
+interface ModelAttemptConfig {
+  model: 'gemini-4-hydrogen' | 'gemini-3.1-flash-lite';
+  thinkingLevel?: ThinkingLevel;
+}
+
+const MODEL_FALLBACK_CHAIN: ModelAttemptConfig[] = [
+  { model: 'gemini-4-hydrogen', thinkingLevel: ThinkingLevel.LOW },
+  { model: 'gemini-3.1-flash-lite' },
+  { model: 'gemini-3.1-flash-lite' },
+];
+
+async function callGeminiWithFallback(text: string): Promise<RawModelReport> {
+  const cached = auditCache.get(text);
+  if (cached) {
+    return cached;
+  }
+
   const ai = getGeminiClient();
-  const maxAttempts = 3;
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let i = 0; i < MODEL_FALLBACK_CHAIN.length; i++) {
+    const { model, thinkingLevel } = MODEL_FALLBACK_CHAIN[i];
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
-        contents: `Audit the following Methods section for reproducibility details:\n\n"""\n${text}\n"""`,
+        model,
+        contents: `Methods:\n"""\n${text}\n"""`,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           responseMimeType: 'application/json',
           responseSchema: RESPONSE_SCHEMA,
           seed: 42,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.LOW,
-          },
+          ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
         },
       });
 
@@ -136,10 +142,20 @@ async function callGeminiWithRetry(text: string): Promise<RawModelReport> {
       if (!rawJson) {
         throw new Error('Empty response from model');
       }
-      return JSON.parse(rawJson) as RawModelReport;
+      const parsed = JSON.parse(rawJson) as RawModelReport;
+
+      if (auditCache.size >= MAX_CACHE_ENTRIES) {
+        const oldestKey = auditCache.keys().next().value;
+        if (oldestKey !== undefined) {
+          auditCache.delete(oldestKey);
+        }
+      }
+      auditCache.set(text, parsed);
+      return parsed;
     } catch (err) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Retrace] ${model} attempt ${i + 1} failed:`, msg.slice(0, 200));
       if (
         msg.includes('MISSING_API_KEY') ||
         msg.includes('API_KEY_INVALID') ||
@@ -149,8 +165,11 @@ async function callGeminiWithRetry(text: string): Promise<RawModelReport> {
       ) {
         throw err;
       }
-      if (attempt < maxAttempts) {
-        const delayMs = 400 * Math.pow(2, attempt - 1);
+      if (!isTransientCapacityError(msg) && i === MODEL_FALLBACK_CHAIN.length - 1) {
+        throw err;
+      }
+      if (i < MODEL_FALLBACK_CHAIN.length - 1) {
+        const delayMs = 800 * (i + 1);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
@@ -188,7 +207,7 @@ export function validateMethodsText(rawText: unknown): {
 }
 
 export async function runMethodsAudit(text: string): Promise<VerifiedReport> {
-  const rawReport = await callGeminiWithRetry(text);
+  const rawReport = await callGeminiWithFallback(text);
   return verifyAndScoreReport(text, rawReport);
 }
 
