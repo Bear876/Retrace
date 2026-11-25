@@ -3,22 +3,33 @@ import { ManuscriptPane } from './components/ManuscriptPane.tsx';
 import { ReferenceSections } from './components/ReferenceSections.tsx';
 import { ResultsPanel } from './components/ResultsPanel.tsx';
 import { TopBar } from './components/TopBar.tsx';
+import { readUploadedDocument } from './lib/fileImport.ts';
 import {
+  computeAuditDiff,
   VerifiedFinding,
   VerifiedReport,
   verifyAndScoreReport,
 } from './lib/reproducibility.ts';
 import { SAMPLE_METHODS_PRESETS, SampleMethodsPreset } from './lib/samples.ts';
 
+type SampleVariant = 'initial' | 'repaired';
+
 export default function App() {
   const [text, setText] = useState<string>('');
   const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [sampleVariant, setSampleVariant] = useState<SampleVariant>('initial');
   const [report, setReport] = useState<VerifiedReport | null>(null);
+  const [previousReport, setPreviousReport] = useState<VerifiedReport | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isImportingFile, setIsImportingFile] = useState<boolean>(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
+  const [insertedFindingIds, setInsertedFindingIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [highlightPulseSeq, setHighlightPulseSeq] = useState<number>(0);
   const [cardPulseSeq, setCardPulseSeq] = useState<number>(0);
 
@@ -30,23 +41,60 @@ export default function App() {
     return trimmed.split(/\s+/).length;
   }, [text]);
 
-  const loadSample = useCallback((preset: SampleMethodsPreset) => {
-    setError(null);
-    setIsLoading(false);
-    setActiveSampleId(preset.id);
-    setText(preset.text);
-    const verified = verifyAndScoreReport(preset.text, preset.precomputedReport);
-    setReport(verified);
-    setIsEditing(false);
-    const firstHighlighted = verified.findings.find(
-      (f) => f.quoteState === 'verified',
-    );
-    setSelectedFindingId(firstHighlighted ? firstHighlighted.id : null);
-    workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
+  const activeSample = useMemo(
+    () => SAMPLE_METHODS_PRESETS.find((p) => p.id === activeSampleId) ?? null,
+    [activeSampleId],
+  );
+
+  const auditDiff = useMemo(() => {
+    if (!previousReport || !report) return null;
+    return computeAuditDiff(previousReport, report);
+  }, [previousReport, report]);
+
+  const loadSample = useCallback(
+    (preset: SampleMethodsPreset, variant: SampleVariant = 'initial') => {
+      setError(null);
+      setIsLoading(false);
+      setImportNotice(null);
+      setInsertedFindingIds(new Set());
+      setActiveSampleId(preset.id);
+      setSampleVariant(variant);
+
+      const initialVerified = verifyAndScoreReport(
+        preset.text,
+        preset.precomputedReport,
+      );
+
+      if (variant === 'repaired') {
+        const repairedVerified = verifyAndScoreReport(
+          preset.repairedText,
+          preset.repairedReport,
+        );
+        setText(preset.repairedText);
+        setPreviousReport(initialVerified);
+        setReport(repairedVerified);
+        const firstHighlighted = repairedVerified.findings.find(
+          (f) => f.quoteState === 'verified',
+        );
+        setSelectedFindingId(firstHighlighted ? firstHighlighted.id : null);
+      } else {
+        setText(preset.text);
+        setPreviousReport(null);
+        setReport(initialVerified);
+        const firstHighlighted = initialVerified.findings.find(
+          (f) => f.quoteState === 'verified',
+        );
+        setSelectedFindingId(firstHighlighted ? firstHighlighted.id : null);
+      }
+
+      setIsEditing(false);
+      workspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    [],
+  );
 
   const handleTopBarSample = useCallback(() => {
-    loadSample(SAMPLE_METHODS_PRESETS[0]);
+    loadSample(SAMPLE_METHODS_PRESETS[0], 'initial');
   }, [loadSample]);
 
   const handleTextChange = (next: string) => {
@@ -59,7 +107,10 @@ export default function App() {
     }
     if (!next.trim()) {
       setReport(null);
+      setPreviousReport(null);
       setSelectedFindingId(null);
+      setInsertedFindingIds(new Set());
+      setImportNotice(null);
       setIsEditing(true);
     }
   };
@@ -67,11 +118,67 @@ export default function App() {
   const handleClear = () => {
     setText('');
     setActiveSampleId(null);
+    setSampleVariant('initial');
     setReport(null);
+    setPreviousReport(null);
     setIsEditing(true);
     setError(null);
+    setImportNotice(null);
+    setInsertedFindingIds(new Set());
     setSelectedFindingId(null);
   };
+
+  const handleUploadFile = useCallback(async (file: File) => {
+    setError(null);
+    setImportNotice(null);
+    setIsImportingFile(true);
+    try {
+      const result = await readUploadedDocument(file);
+      setText(result.text);
+      setActiveSampleId(null);
+      setSampleVariant('initial');
+      setReport(null);
+      setPreviousReport(null);
+      setSelectedFindingId(null);
+      setInsertedFindingIds(new Set());
+      setIsEditing(true);
+      setImportNotice(
+        result.extractedMethodsOnly
+          ? `Extracted Methods section from ${result.fileName}. Click Check methods to audit.`
+          : `Loaded text from ${result.fileName}. Click Check methods to audit.`,
+      );
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Unable to read that file. Please paste your methods text directly.';
+      setError(msg);
+    } finally {
+      setIsImportingFile(false);
+    }
+  }, []);
+
+  const handleInsertTemplate = useCallback(
+    (findingId: string, templateText: string) => {
+      const trimmedTemplate = templateText.trim();
+      if (!trimmedTemplate) return;
+
+      setText((prev) => {
+        const trimmedPrev = prev.trimEnd();
+        if (!trimmedPrev) return trimmedTemplate;
+        const needsPeriod = !/[.!?]$/.test(trimmedPrev);
+        return `${trimmedPrev}${needsPeriod ? '.' : ''} ${trimmedTemplate}`;
+      });
+      setActiveSampleId(null);
+      setIsEditing(true);
+      setInsertedFindingIds((prev) => {
+        const next = new Set(prev);
+        next.add(findingId);
+        return next;
+      });
+    },
+    [],
+  );
 
   const handleCheckMethods = useCallback(async () => {
     const trimmed = text.trim();
@@ -107,7 +214,14 @@ export default function App() {
         skippedCategories: data.skippedCategories,
       });
 
+      if (report && report.sourceText !== text) {
+        setPreviousReport(report);
+      } else if (!report) {
+        setPreviousReport(null);
+      }
+
       setReport(verified);
+      setInsertedFindingIds(new Set());
       setIsEditing(false);
       const firstHighlighted = verified.findings.find(
         (f) => f.quoteState === 'verified',
@@ -122,7 +236,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [text]);
+  }, [text, report]);
 
   const handleSelectFindingFromHighlight = useCallback((findingId: string) => {
     setSelectedFindingId(findingId);
@@ -150,7 +264,7 @@ export default function App() {
             Check a methods section for missing reproducibility details
           </h1>
           <p className="text-sm text-zinc-600 max-w-3xl">
-            Paste a paper or lab report methods section below, or load a sample to see what a reader would need in order to repeat the work.
+            Paste a paper or lab report methods section below, upload a .txt, .md, or .pdf file, or load a sample to compare an initial draft against a repaired revision.
           </p>
         </section>
 
@@ -158,7 +272,7 @@ export default function App() {
         <div
           id="workspace"
           ref={workspaceRef}
-          className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between scroll-mt-16"
+          className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between scroll-mt-16"
         >
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-zinc-500 mr-1 whitespace-nowrap">Sample:</span>
@@ -168,7 +282,7 @@ export default function App() {
                 <button
                   key={preset.id}
                   type="button"
-                  onClick={() => loadSample(preset)}
+                  onClick={() => loadSample(preset, 'initial')}
                   className={`rounded-xs border px-2.5 py-1 text-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     active
                       ? 'border-zinc-900 bg-zinc-900 text-white font-medium'
@@ -179,9 +293,40 @@ export default function App() {
                 </button>
               );
             })}
+
+            {activeSample && report?.sourceText === text && (
+              <div
+                className="inline-flex items-center rounded-xs border border-zinc-300 bg-white p-0.5 ml-0 sm:ml-2"
+                role="group"
+                aria-label="Compare sample draft version"
+              >
+                <button
+                  type="button"
+                  onClick={() => loadSample(activeSample, 'initial')}
+                  className={`px-2.5 py-0.5 text-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    sampleVariant === 'initial'
+                      ? 'bg-zinc-900 text-white font-medium'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  Initial draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => loadSample(activeSample, 'repaired')}
+                  className={`px-2.5 py-0.5 text-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    sampleVariant === 'repaired'
+                      ? 'bg-emerald-800 text-white font-medium'
+                      : 'text-zinc-600 hover:text-zinc-900'
+                  }`}
+                >
+                  Repaired draft
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 sm:justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-3 lg:justify-end">
             <span className="font-mono text-xs text-zinc-500 tabular-nums whitespace-nowrap">
               {wordCount} words · {text.length} chars
             </span>
@@ -190,7 +335,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleClear}
-                disabled={isLoading}
+                disabled={isLoading || isImportingFile}
                 className="text-xs font-medium text-zinc-600 hover:text-zinc-950 underline underline-offset-4 disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Clear
@@ -200,7 +345,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleCheckMethods}
-              disabled={isLoading}
+              disabled={isLoading || isImportingFile}
               className="rounded-xs bg-zinc-900 px-4 py-2 text-xs font-medium text-white hover:bg-zinc-800 disabled:opacity-60 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {isLoading ? 'Checking…' : 'Check methods'}
@@ -221,18 +366,25 @@ export default function App() {
               highlightPulseSeq={highlightPulseSeq}
               onSelectFindingFromHighlight={handleSelectFindingFromHighlight}
               onSubmitShortcut={handleCheckMethods}
+              onUploadFile={handleUploadFile}
+              isImportingFile={isImportingFile}
+              importNotice={importNotice}
+              onDismissImportNotice={() => setImportNotice(null)}
             />
           </div>
 
           <div className="lg:col-span-6">
             <ResultsPanel
               report={report}
+              auditDiff={auditDiff}
               isLoading={isLoading}
               isOutdated={Boolean(report && report.sourceText !== text)}
               error={error}
               selectedFindingId={selectedFindingId}
               cardPulseSeq={cardPulseSeq}
+              insertedFindingIds={insertedFindingIds}
               onSelectFindingFromCard={handleSelectFindingFromCard}
+              onInsertTemplate={handleInsertTemplate}
               onDismissError={() => setError(null)}
             />
           </div>
