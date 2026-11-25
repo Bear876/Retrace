@@ -1,19 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, Copy, Loader2 } from 'lucide-react';
 import {
+  AlertTriangle,
+  Check,
+  Copy,
+  Download,
+  Loader2,
+  Plus,
+} from 'lucide-react';
+import {
+  AuditDiff,
   FindingStatus,
+  formatReportAsMarkdown,
   VerifiedFinding,
   VerifiedReport,
 } from '../lib/reproducibility.ts';
 
 interface ResultsPanelProps {
   report: VerifiedReport | null;
+  auditDiff: AuditDiff | null;
   isLoading: boolean;
   isOutdated?: boolean;
   error: string | null;
   selectedFindingId: string | null;
   cardPulseSeq: number;
+  insertedFindingIds: Set<string>;
   onSelectFindingFromCard: (finding: VerifiedFinding) => void;
+  onInsertTemplate: (findingId: string, templateText: string) => void;
   onDismissError: () => void;
 }
 
@@ -42,16 +54,20 @@ const STATUS_DISPLAY: Record<
 
 export function ResultsPanel({
   report,
+  auditDiff,
   isLoading,
   isOutdated = false,
   error,
   selectedFindingId,
   cardPulseSeq,
+  insertedFindingIds,
   onSelectFindingFromCard,
+  onInsertTemplate,
   onDismissError,
 }: ResultsPanelProps) {
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedReport, setCopiedReport] = useState<boolean>(false);
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
@@ -84,11 +100,11 @@ export function ResultsPanel({
   const handleCopyFix = async (
     e: React.MouseEvent,
     findingId: string,
-    fixText: string,
+    copyText: string,
   ) => {
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(fixText);
+      await navigator.clipboard.writeText(copyText);
       setCopiedId(findingId);
       window.setTimeout(() => {
         setCopiedId((cur) => (cur === findingId ? null : cur));
@@ -98,18 +114,83 @@ export function ResultsPanel({
     }
   };
 
+  const handleCopyReport = async () => {
+    if (!report) return;
+    try {
+      const markdown = formatReportAsMarkdown(report, auditDiff);
+      await navigator.clipboard.writeText(markdown);
+      setCopiedReport(true);
+      window.setTimeout(() => setCopiedReport(false), 1800);
+    } catch {
+      // Clipboard blocked in restricted browser context; fail silently
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!report) return;
+    const markdown = formatReportAsMarkdown(report, auditDiff);
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'retrace-audit.md';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section
       aria-label="Reproducibility audit results"
       aria-live="polite"
       className="flex flex-col rounded-xs border border-zinc-300 bg-white"
     >
-      <div className="flex items-center justify-between gap-4 border-b border-zinc-200 px-5 py-3">
-        <h2 className="text-sm font-medium text-zinc-900">Review Notes</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-5 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-sm font-medium text-zinc-900 whitespace-nowrap shrink-0">
+            Review Notes
+          </h2>
+          {report && !isLoading && (
+            <>
+              <span className="text-zinc-300" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-xs text-zinc-500 truncate max-w-[200px]">
+                {report.studyType}
+              </span>
+            </>
+          )}
+        </div>
+
         {report && !isLoading && (
-          <span className="text-xs text-zinc-500 truncate max-w-[260px]">
-            {report.studyType}
-          </span>
+          <div className="flex items-center gap-3.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyReport}
+              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-950 hover:underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              {copiedReport ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-700" aria-hidden="true" />
+                  Copied report
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                  Copy report
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadMarkdown}
+              className="inline-flex items-center gap-1 text-xs font-medium text-zinc-600 hover:text-zinc-950 hover:underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              Export .md
+            </button>
+          </div>
         )}
       </div>
 
@@ -155,7 +236,7 @@ export function ResultsPanel({
               No methods text checked yet
             </p>
             <p className="mt-2 text-sm leading-relaxed text-zinc-600">
-              Paste a paper or lab report methods section on the left and select{' '}
+              Paste a paper or lab report methods section on the left (or upload a .txt, .md, or .pdf file) and select{' '}
               <span className="font-medium text-zinc-900">Check methods</span>, or load one of the sample passages above.
             </p>
             <ul className="mt-5 space-y-2 border-t border-zinc-200 pt-4 text-xs text-zinc-600">
@@ -168,20 +249,20 @@ export function ResultsPanel({
           <div className="flex flex-col">
             {isOutdated && (
               <div className="border-b border-amber-200 bg-amber-50/70 px-5 py-2 text-xs text-amber-900">
-                Draft edited since this review. Click <span className="font-medium">Check methods</span> to re-audit.
+                Draft edited since this review. Click <span className="font-medium">Check methods</span> to compare updated score.
               </div>
             )}
             {/* Flat Ruled Summary Block */}
             <div className="border-b border-zinc-200 px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <div className="flex items-baseline gap-2">
+                <div className="flex flex-wrap items-baseline gap-2">
                   <span className="font-mono text-2xl font-semibold tracking-tight text-zinc-900 tabular-nums">
                     {report.score.points}
                   </span>
                   <span className="font-mono text-sm text-zinc-500 tabular-nums">
                     / {report.score.totalApplicable}
                   </span>
-                  <span className="text-xs text-zinc-600 ml-1">
+                  <span className="text-xs text-zinc-600 ml-0.5">
                     applicable findings addressed
                   </span>
                 </div>
@@ -204,6 +285,24 @@ export function ResultsPanel({
                   </span>
                 </div>
               </div>
+
+              {auditDiff && (
+                <p
+                  className={`mt-1.5 font-mono text-xs tabular-nums ${
+                    auditDiff.pointsDelta > 0
+                      ? 'text-emerald-800 font-medium'
+                      : auditDiff.pointsDelta < 0
+                        ? 'text-rose-800 font-medium'
+                        : 'text-zinc-500'
+                  }`}
+                >
+                  {auditDiff.pointsDelta > 0
+                    ? `+${auditDiff.pointsDelta} vs. prior check (${auditDiff.previousPoints} / ${auditDiff.previousTotal} -> ${auditDiff.currentPoints} / ${auditDiff.currentTotal})`
+                    : auditDiff.pointsDelta < 0
+                      ? `${auditDiff.pointsDelta} vs. prior check (${auditDiff.previousPoints} / ${auditDiff.previousTotal} -> ${auditDiff.currentPoints} / ${auditDiff.currentTotal})`
+                      : `No score change vs. prior check (${auditDiff.currentPoints} / ${auditDiff.currentTotal})`}
+                </p>
+              )}
 
               {report.score.totalApplicable > 0 && (
                 <div
@@ -251,10 +350,19 @@ export function ResultsPanel({
               )}
 
               {report.skippedCategories.length > 0 && (
-                <p className="mt-1.5 text-xs text-zinc-500">
-                  <span className="font-medium text-zinc-700">Skipped:</span>{' '}
-                  {report.skippedCategories.map((s) => s.category).join(', ')}
-                </p>
+                <div className="mt-3 border-t border-zinc-200 pt-2.5 text-xs text-zinc-600">
+                  <p className="font-medium text-zinc-700">
+                    Skipped categories (not applicable to study type):
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {report.skippedCategories.map((s) => (
+                      <li key={s.category}>
+                        <span className="font-medium text-zinc-800">{s.category}:</span>{' '}
+                        {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
 
@@ -303,6 +411,9 @@ export function ResultsPanel({
                   const statusMeta = STATUS_DISPLAY[finding.status];
                   const isSelected = selectedFindingId === finding.id;
                   const canJump = !isOutdated && finding.quoteState === 'verified';
+                  const statusChange = auditDiff?.categoryChanges[finding.category];
+                  const templateToUse = finding.draftTemplate || '';
+                  const isInserted = insertedFindingIds.has(finding.id);
 
                   return (
                     <article
@@ -321,11 +432,18 @@ export function ResultsPanel({
                         <h3 className="text-sm font-semibold text-zinc-900">
                           {finding.category}
                         </h3>
-                        <span
-                          className={`text-xs font-medium whitespace-nowrap shrink-0 ${statusMeta.textClass}`}
-                        >
-                          {statusMeta.symbol} {statusMeta.label}
-                        </span>
+                        <div className="flex items-baseline gap-2 whitespace-nowrap shrink-0">
+                          {statusChange && (
+                            <span className="text-xs text-zinc-500">
+                              was {STATUS_DISPLAY[statusChange.from].label}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs font-medium ${statusMeta.textClass}`}
+                          >
+                            {statusMeta.symbol} {statusMeta.label}
+                          </span>
+                        </div>
                       </div>
 
                       {finding.quoteState === 'verified' && finding.quote && (
@@ -371,35 +489,95 @@ export function ResultsPanel({
                         {finding.issue}
                       </p>
 
-                      {finding.suggestedFix && (
-                        <div className="mt-2.5 flex flex-col gap-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-medium text-zinc-500">
-                              Suggested addition
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) =>
-                                handleCopyFix(e, finding.id, finding.suggestedFix)
-                              }
-                              className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-950 underline underline-offset-2 cursor-pointer"
-                            >
-                              {copiedId === finding.id ? (
-                                <>
-                                  <Check className="h-3 w-3 text-emerald-700" aria-hidden="true" />
-                                  Copied
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="h-3 w-3" aria-hidden="true" />
-                                  Copy
-                                </>
-                              )}
-                            </button>
-                          </div>
-                          <p className="text-xs leading-relaxed text-zinc-600">
-                            {finding.suggestedFix}
-                          </p>
+                      {(finding.suggestedFix || templateToUse) && (
+                        <div className="mt-2.5 flex flex-col gap-1.5">
+                          {finding.suggestedFix && (
+                            <div>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-zinc-500">
+                                  Suggested addition
+                                </span>
+                                {!templateToUse && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) =>
+                                      handleCopyFix(e, finding.id, finding.suggestedFix)
+                                    }
+                                    className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-950 underline underline-offset-2 cursor-pointer"
+                                  >
+                                    {copiedId === finding.id ? (
+                                      <>
+                                        <Check className="h-3 w-3 text-emerald-700" aria-hidden="true" />
+                                        Copied
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3" aria-hidden="true" />
+                                        Copy
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              <p className="mt-0.5 text-xs leading-relaxed text-zinc-600">
+                                {finding.suggestedFix}
+                              </p>
+                            </div>
+                          )}
+
+                          {templateToUse && (
+                            <div className="pt-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-zinc-500">
+                                  Draft template
+                                </span>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={(e) =>
+                                      handleCopyFix(e, finding.id, templateToUse)
+                                    }
+                                    className="inline-flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-950 underline underline-offset-2 whitespace-nowrap shrink-0 cursor-pointer"
+                                  >
+                                    {copiedId === finding.id ? (
+                                      <>
+                                        <Check className="h-3 w-3 text-emerald-700" aria-hidden="true" />
+                                        Copied
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3" aria-hidden="true" />
+                                        Copy template
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onInsertTemplate(finding.id, templateToUse);
+                                    }}
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-zinc-800 hover:text-zinc-950 underline underline-offset-2 whitespace-nowrap shrink-0 cursor-pointer"
+                                  >
+                                    {isInserted ? (
+                                      <>
+                                        <Check className="h-3 w-3 text-emerald-700" aria-hidden="true" />
+                                        Inserted
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Plus className="h-3 w-3" aria-hidden="true" />
+                                        Insert into draft
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="mt-1 font-mono text-xs leading-relaxed text-zinc-700">
+                                {templateToUse}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </article>
